@@ -26,7 +26,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-paper text-ink">
+      <body
+        // Browser extensions (Grammarly and similar) inject attributes into
+        // <body> before React hydrates, which reports as a hydration mismatch
+        // that no change to our markup can fix.
+        suppressHydrationWarning
+        className="flex min-h-full flex-col bg-paper text-ink"
+      >
         <Nav />
         {children}
       </body>
