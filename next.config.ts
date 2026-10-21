@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Disabled deliberately: every admin page must show live database state,
+  // so each route is force-dynamic. Cache Components would remove that segment
+  // config and require Suspense around every uncached read for no benefit here.
+  cacheComponents: false,
+  // partialPrefetching requires cacheComponents, which is off above.
   turbopack: {
     rules: {
       "*.css": {

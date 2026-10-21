@@ -1,26 +1,180 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Sunday Funnies palette. Newsprint cream, comic-ink navy, and the three
+   spot colors a newspaper colour press could actually run.
+--------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --paper:        #fff6e9;
+  --paper-raised: #fffdf8;
+  --ink:          #16213e;
+  --ink-soft:     #5a6378;
+  --rule:         #16213e1f;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --red:    #d62d1f;
+  --blue:   #2d6cdf;
+  --yellow: #ffc93c;
+  --green:  #1e8136;
+
+  --red-tint:    #fde8e6;
+  --blue-tint:   #e6f0fd;
+  --yellow-tint: #fff3cc;
+  --green-tint:  #e3f6e8;
+
+  --ink-fixed: #16213e;
+
+  --shadow-hard: 4px 4px 0 var(--ink);
+  --shadow-hard-sm: 2px 2px 0 var(--ink);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper:        #14121c;
+    --paper-raised: #1e1b29;
+    --ink:          #f6ead9;
+    --ink-soft:     #a79fb4;
+    --rule:         #f6ead92b;
+
+    --red:    #d62d1f;
+    --blue:   #6f9dff;
+    --yellow: #ffd166;
+    --green:  #1e8136;
+
+    --red-tint:    #3a2320;
+    --blue-tint:   #1d2740;
+    --yellow-tint: #3a2f17;
+    --green-tint:  #1b3324;
+
+    --shadow-hard: 4px 4px 0 #000;
+    --shadow-hard-sm: 2px 2px 0 #000;
   }
 }
 
+@theme inline {
+  --color-paper:        var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink:          var(--ink);
+  --color-ink-soft:     var(--ink-soft);
+  --color-ink-fixed:    var(--ink-fixed);
+  --color-rule:         var(--rule);
+  --color-comic-red:    var(--red);
+  --color-comic-blue:   var(--blue);
+  --color-comic-yellow: var(--yellow);
+  --color-comic-green:  var(--green);
+  --color-red-tint:     var(--red-tint);
+  --color-blue-tint:    var(--blue-tint);
+  --color-yellow-tint:  var(--yellow-tint);
+  --color-green-tint:   var(--green-tint);
+
+  --font-display: var(--font-fraunces);
+  --font-sans:    var(--font-inter);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Newsprint halftone. Sits behind the hero only, so body copy stays crisp. */
+.halftone {
+  background-image: radial-gradient(var(--ink) 1px, transparent 1px);
+  background-size: 9px 9px;
+  opacity: 0.09;
+}
+
+/* Comic panel: hard ink border with an offset shadow instead of a soft blur. */
+.panel {
+  background-color: var(--paper-raised);
+  border: 2px solid var(--ink);
+  border-radius: 1.125rem;
+  box-shadow: var(--shadow-hard);
+}
+
+/* Small panel: content boxes and wide buttons. A modest radius, because a
+   pill radius pushes multi-line text past the curve. */
+.panel-sm {
+  border: 2px solid var(--ink);
+  border-radius: 0.875rem;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+/* Fully round, for compact single-line buttons only. */
+.pill {
+  border-radius: 999px;
+}
+
+/* Cards lift toward the reader on hover rather than sliding. */
+.panel-hover {
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.panel-hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .panel-hover:hover { box-shadow: 6px 6px 0 #000; }
+}
+
+/* Pressed state for the chunky buttons - the shadow collapses under them. */
+.press:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-hover, .press { transition: none; }
+  .panel-hover:hover, .press:active:not(:disabled) { transform: none; }
+}
+
+/* Visible keyboard focus everywhere. Mouse users never see it. */
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Screen-reader-only helper, used by the loading state. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Chart marks. Blue/red rather than the semantic green/red: the green/red pair
+   separates by only ΔE 7.3 under deuteranopia (the validator's floor band),
+   while blue/red reaches 28.6. Both steps clear the lightness band on the
+   cream AND the dark surface, so the same two values serve both themes -
+   the lifted variants actually fail the dark band.
+--------------------------------------------------------------------------- */
+:root {
+  --series-up:   #2d6cdf;
+  --series-down: #d62d1f;
+  --grid:        #16213e1a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --grid: #f6ead91f; }
+}
+
+@theme inline {
+  --color-series-up:   var(--series-up);
+  --color-series-down: var(--series-down);
+  --color-grid:        var(--grid);
+}
+
+/* Data ends are rounded; the baseline end is square so bars sit on the axis. */
+.bar-mark {
+  border-radius: 4px 4px 0 0;
+}
+.bar-mark-h {
+  border-radius: 0 4px 4px 0;
 }
