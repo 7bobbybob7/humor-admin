@@ -36,7 +36,9 @@ export function ResourceForm({
       {fields.map((field) => {
         const current = row?.[field.name];
         const defaultText =
-          current === null || current === undefined ? "" : String(current);
+          current === null || current === undefined
+            ? (editing ? "" : (field.initial ?? ""))
+            : String(current);
 
         return (
           <label key={field.name} className="block text-sm">
@@ -84,7 +86,9 @@ export function ResourceForm({
                 name={field.name}
                 defaultValue={defaultText}
                 required={field.required}
-                maxLength={field.max}
+                maxLength={field.type === "number" ? undefined : field.max}
+                min={field.type === "number" ? 0 : undefined}
+                step={field.type === "number" ? 1 : undefined}
                 className={INPUT}
               />
             )}

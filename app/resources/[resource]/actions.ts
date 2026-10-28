@@ -61,10 +61,14 @@ export async function updateRow(
   const built = payloadFromForm(resource, formData);
   if ("error" in built) return { error: built.error };
 
+  const values = resource.touchUpdatedAt
+    ? { ...built.values, updated_at: new Date().toISOString() }
+    : built.values;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from(resource.table)
-    .update(built.values)
+    .update(values)
     .eq("id", id)
     .select("id");
 
@@ -82,15 +86,31 @@ export async function updateRow(
 
 export async function deleteRow(formData: FormData): Promise<void> {
   const resolved = await resolve(formData, "delete");
-  if ("error" in resolved) return;
+  if ("error" in resolved) redirect(`/?denied=1`);
   const { resource } = resolved;
 
   const id = Number(formData.get("__id"));
-  if (!Number.isInteger(id) || id <= 0) return;
+  if (!Number.isInteger(id) || id <= 0) {
+    redirect(`/resources/${resource.slug}?failed=bad-id`);
+  }
 
   const supabase = await createClient();
-  await supabase.from(resource.table).delete().eq("id", id);
+  const { data, error } = await supabase
+    .from(resource.table)
+    .delete()
+    .eq("id", id)
+    .select("id");
 
   revalidatePath(`/resources/${resource.slug}`);
+
+  // Same trap as the update: a row the policy hides is not deleted and does
+  // not raise, so reporting success on an empty result would be wrong.
+  if (error) {
+    redirect(`/resources/${resource.slug}?failed=${encodeURIComponent(error.message)}`);
+  }
+  if (!data || data.length === 0) {
+    redirect(`/resources/${resource.slug}?failed=nothing-deleted`);
+  }
+
   redirect(`/resources/${resource.slug}?deleted=1`);
 }

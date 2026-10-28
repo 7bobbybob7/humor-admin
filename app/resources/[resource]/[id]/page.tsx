@@ -41,7 +41,7 @@ export default async function EditResourcePage({
 
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <h1 className="font-display text-3xl font-black">
-          {resource.title.replace(/s$/, "")} #{String(row.id)}
+          {resource.singular} #{String(row.id)}
         </h1>
         {can(resource, "delete") && (
           <DeleteRow slug={resource.slug} id={numericId} />

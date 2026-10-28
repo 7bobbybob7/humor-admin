@@ -32,7 +32,7 @@ export default async function NewResourcePage({
         ← Back to {resource.title.toLowerCase()}
       </Link>
       <h1 className="mt-3 font-display text-3xl font-black">
-        New {resource.title.replace(/s$/, "").toLowerCase()}
+        New {resource.singular.toLowerCase()}
       </h1>
       <div className="panel mt-6 p-6">
         <ResourceForm slug={resource.slug} fields={fields} submitLabel="Create" />

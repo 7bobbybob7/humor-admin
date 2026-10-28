@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
-import { generateCaptions } from "@/lib/gemini";
+import { markRequestFailed, runGeneration } from "@/lib/pipeline";
 
 export type MediaState = { error?: string; success?: string };
 
@@ -27,9 +27,12 @@ export async function createMedia(
     return { error: `Keep the topic under ${MAX_TOPIC} characters.` };
   }
 
+  // Generated through the same pipeline the main app uses, so a caption made
+  // here honours the configured chain, terms and examples, and is recorded
+  // under Requests like any other.
   let result;
   try {
-    result = await generateCaptions(topic);
+    result = await runGeneration(admin.id, topic);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "The model call failed." };
   }
@@ -40,13 +43,17 @@ export async function createMedia(
       user_id: admin.id,
       author_first_name: admin.first_name,
       prompt: topic,
-      system_prompt: result.prompt,
+      system_prompt: result.systemPrompt,
       model: result.model,
+      request_id: result.requestId,
       caption,
     })),
   );
 
-  if (error) return { error: `Could not save: ${error.message}` };
+  if (error) {
+    await markRequestFailed(result.requestId, `Saving captions failed: ${error.message}`);
+    return { error: `Could not save: ${error.message}` };
+  }
 
   revalidatePath("/media");
   revalidatePath("/");
@@ -107,9 +114,18 @@ export async function deleteMedia(formData: FormData): Promise<void> {
   const supabase = await createClient();
   // Votes reference generations with on delete cascade, so this removes the
   // caption and its votes together rather than orphaning them.
-  await supabase.from("generations").delete().eq("id", id);
+  const { data, error } = await supabase
+    .from("generations")
+    .delete()
+    .eq("id", id)
+    .select("id");
 
   revalidatePath("/media");
   revalidatePath("/");
+
+  // A delete the policy filters out removes nothing and does not raise.
+  if (error) redirect(`/media?failed=${encodeURIComponent(error.message)}`);
+  if (!data || data.length === 0) redirect("/media?failed=nothing-deleted");
+
   redirect("/media?deleted=1");
 }

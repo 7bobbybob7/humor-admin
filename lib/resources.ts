@@ -20,6 +20,9 @@ export type Field = {
   required?: boolean;
   max?: number;
   help?: string;
+  /** Prefilled when creating. Needed where the column is NOT NULL with a
+   *  default: an empty box would otherwise post null and be rejected. */
+  initial?: string;
   /** For `select`: fill the options from another table. */
   optionsFrom?: { table: string; value: string; label: string };
   /** For `select`: a fixed option list. */
@@ -32,6 +35,9 @@ export type Resource = {
   slug: string;
   table: string;
   title: string;
+  /** Heading for one row. Spelled out because stripping a trailing "s" from
+   *  the title turns "addresses" into "addresse". */
+  singular: string;
   blurb: string;
   capabilities: Capability[];
   /** Columns fetched for the list view. */
@@ -40,6 +46,8 @@ export type Resource = {
   list: { name: string; label: string; kind?: "bool" | "date" | "mono" | "long" }[];
   fields: Field[];
   order: { column: string; ascending: boolean };
+  /** Stamp updated_at on every update. No database trigger does this. */
+  touchUpdatedAt?: boolean;
 };
 
 export const RESOURCES: Resource[] = [
@@ -47,6 +55,7 @@ export const RESOURCES: Resource[] = [
     slug: "llm-providers",
     table: "llm_providers",
     title: "LLM providers",
+    singular: "LLM provider",
     blurb: "Vendors the generator can call.",
     capabilities: ["create", "read", "update", "delete"],
     select: "id, name, slug, docs_url, is_active, created_at",
@@ -70,6 +79,7 @@ export const RESOURCES: Resource[] = [
     slug: "llm-models",
     table: "llm_models",
     title: "LLM models",
+    singular: "LLM model",
     blurb:
       "The generator tries active models in priority order, lowest first, and records each attempt.",
     capabilities: ["create", "read", "update", "delete"],
@@ -88,8 +98,8 @@ export const RESOURCES: Resource[] = [
       { name: "model_key", label: "API key name", type: "text", required: true, max: 120,
         help: "Exactly what the SDK is called with, e.g. gemini-flash-latest." },
       { name: "display_name", label: "Display name", type: "text", required: true, max: 120 },
-      { name: "priority", label: "Priority", type: "number",
-        help: "Lower is tried first." },
+      { name: "priority", label: "Priority", type: "number", required: true,
+        initial: "100", help: "Lower is tried first." },
       { name: "is_active", label: "Active", type: "boolean" },
       { name: "notes", label: "Notes", type: "textarea", max: 500 },
     ],
@@ -99,6 +109,7 @@ export const RESOURCES: Resource[] = [
     slug: "prompt-chains",
     table: "prompt_chains",
     title: "Prompt chains",
+    singular: "Prompt chain",
     blurb: "Named prompt pipelines. Read-only — edit the steps and the mix instead.",
     capabilities: ["read"],
     select: "id, name, slug, description, is_active, created_at",
@@ -115,6 +126,7 @@ export const RESOURCES: Resource[] = [
     slug: "prompt-chain-steps",
     table: "prompt_chain_steps",
     title: "Prompt chain steps",
+    singular: "Prompt chain step",
     blurb:
       "Ordered templates concatenated to build a prompt. {{topic}}, {{count}}, {{terms}} and {{examples}} are substituted at run time.",
     capabilities: ["read"],
@@ -133,6 +145,7 @@ export const RESOURCES: Resource[] = [
     slug: "prompt-chain-mix",
     table: "prompt_chain_mix",
     title: "Prompt chain mix",
+    singular: "Chain weight",
     blurb:
       "How traffic is split between chains. A request picks a chain at random, weighted by these numbers; weight 0 retires a chain without deleting it.",
     capabilities: ["read", "update"],
@@ -147,11 +160,13 @@ export const RESOURCES: Resource[] = [
         help: "Relative share of traffic. 0 disables the chain." },
     ],
     order: { column: "id", ascending: true },
+    touchUpdatedAt: true,
   },
   {
     slug: "terms",
     table: "terms",
     title: "Terms",
+    singular: "Term",
     blurb:
       "Vocabulary steering. Active terms are folded into the prompt as words to avoid or prefer.",
     capabilities: ["create", "read", "update", "delete"],
@@ -178,6 +193,7 @@ export const RESOURCES: Resource[] = [
     slug: "examples",
     table: "ai_generation_examples",
     title: "AI generation examples",
+    singular: "AI generation example",
     blurb:
       "Few-shot examples. Active examples for the chosen chain are shown to the model as the target voice.",
     capabilities: ["create", "read", "update", "delete"],
@@ -202,6 +218,7 @@ export const RESOURCES: Resource[] = [
     slug: "signup-domains",
     table: "allowed_signup_domains",
     title: "Allowed signup domains",
+    singular: "Allowed signup domain",
     blurb: "Email domains permitted to create an account.",
     capabilities: ["create", "read", "update", "delete"],
     select: "id, domain, note, is_active, created_at",
@@ -223,6 +240,7 @@ export const RESOURCES: Resource[] = [
     slug: "whitelisted-emails",
     table: "whitelisted_emails",
     title: "Whitelisted e-mail addresses",
+    singular: "Whitelisted e-mail address",
     blurb: "Individual addresses allowed regardless of domain.",
     capabilities: ["create", "read", "update", "delete"],
     select: "id, email, note, is_active, created_at",

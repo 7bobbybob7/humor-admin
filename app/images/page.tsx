@@ -5,8 +5,11 @@ import { Upload } from "./upload";
 
 export const dynamic = "force-dynamic";
 
-export default async function ImagesPage() {
+export default async function ImagesPage({
+  searchParams,
+}: PageProps<"/images">) {
   await requireSuperadmin();
+  const { deleted, failed } = await searchParams;
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -25,6 +28,21 @@ export default async function ImagesPage() {
         Supabase Storage; this table holds only the pointer, so deleting a row
         removes the stored object too.
       </p>
+
+      {deleted && (
+        <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
+          Deleted.
+        </p>
+      )}
+      {failed && (
+        <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
+          {failed === "nothing-deleted"
+            ? "Nothing was deleted — the row may already be gone."
+            : failed === "gone"
+              ? "That image no longer exists."
+              : `Could not delete: ${failed}`}
+        </p>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[22rem_1fr]">
         <section className="panel h-fit p-5">

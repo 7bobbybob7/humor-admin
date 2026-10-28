@@ -16,6 +16,19 @@ export function Upload() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [clearedFor, setClearedFor] = useState<number | null>(null);
+
+  // Clear the picker once the row is saved. Leaving the previous upload in
+  // place let a second submit re-register the same object, which trips the
+  // unique (bucket, path) constraint. Adjusted during render rather than in
+  // an effect: the state derives from the action's result, so an effect would
+  // render the stale value first and then immediately render again.
+  if (state.savedId !== undefined && state.savedId !== clearedFor) {
+    setClearedFor(state.savedId);
+    setPath("");
+    setUrl("");
+    setError(null);
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -54,7 +67,7 @@ export function Upload() {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form key={state.savedId ?? 0} action={formAction} className="space-y-4">
       <input type="hidden" name="path" value={path} />
       <input type="hidden" name="public_url" value={url} />
 

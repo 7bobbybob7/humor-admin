@@ -1,10 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireSuperadmin } from "@/lib/admin";
 import { createClient } from "@/lib/supabase/server";
 
-export type ImageState = { error?: string; success?: string };
+/** savedId changes on every successful save, so the form can tell one
+ *  success from the next and clear itself. */
+export type ImageState = { error?: string; success?: string; savedId?: number };
 
 const BUCKET = "images";
 
@@ -35,18 +38,22 @@ export async function registerImage(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("images").insert({
-    bucket: BUCKET,
-    path,
-    public_url: publicUrl,
-    alt_text: altText || null,
-    uploaded_by: admin.id,
-  });
+  const { data, error } = await supabase
+    .from("images")
+    .insert({
+      bucket: BUCKET,
+      path,
+      public_url: publicUrl,
+      alt_text: altText || null,
+      uploaded_by: admin.id,
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) return { error: error.message };
 
   revalidatePath("/images");
-  return { success: "Image added." };
+  return { success: "Image added.", savedId: Number(data?.id ?? Date.now()) };
 }
 
 export async function updateImageAlt(
@@ -90,11 +97,29 @@ export async function deleteImage(formData: FormData): Promise<void> {
     .eq("id", id)
     .maybeSingle();
 
+  if (!row) redirect("/images?failed=gone");
+
   // Remove the object first; deleting only the row would orphan the bytes.
-  if (row?.path) {
-    await supabase.storage.from(BUCKET).remove([row.path as string]);
+  // If the object cannot be removed, keep the row: a row pointing at bytes
+  // that still exist is recoverable, bytes nobody has a pointer to are not.
+  const { error: storageError } = await supabase.storage
+    .from(BUCKET)
+    .remove([row.path as string]);
+
+  if (storageError) {
+    redirect(`/images?failed=${encodeURIComponent(storageError.message)}`);
   }
-  await supabase.from("images").delete().eq("id", id);
+
+  const { data: deleted, error } = await supabase
+    .from("images")
+    .delete()
+    .eq("id", id)
+    .select("id");
 
   revalidatePath("/images");
+
+  if (error) redirect(`/images?failed=${encodeURIComponent(error.message)}`);
+  if (!deleted || deleted.length === 0) redirect("/images?failed=nothing-deleted");
+
+  redirect("/images?deleted=1");
 }

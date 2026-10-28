@@ -99,7 +99,11 @@ export function payloadFromForm(
 
     if (field.type === "number" || (field.type === "select" && field.optionsFrom)) {
       const n = Number(text);
-      if (!Number.isFinite(n)) return { error: `${field.label} must be a number.` };
+      // Every numeric column here is an integer, so reject a decimal in the
+      // form rather than letting Postgres reject it with a type error.
+      if (!Number.isInteger(n)) {
+        return { error: `${field.label} must be a whole number.` };
+      }
       values[field.name] = n;
       continue;
     }

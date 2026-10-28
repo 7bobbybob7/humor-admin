@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function MediaPage({ searchParams }: PageProps<"/media">) {
   await requireSuperadmin();
 
-  const { q, created, deleted } = await searchParams;
+  const { q, created, deleted, failed } = await searchParams;
   const search = (Array.isArray(q) ? q[0] : q)?.slice(0, 100) ?? "";
   const rows = await listGenerations(search);
 
@@ -43,6 +43,13 @@ export default async function MediaPage({ searchParams }: PageProps<"/media">) {
       {deleted && (
         <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
           Caption deleted, along with its votes.
+        </p>
+      )}
+      {failed && (
+        <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
+          {failed === "nothing-deleted"
+            ? "Nothing was deleted — the caption may already be gone."
+            : `Could not delete: ${failed}`}
         </p>
       )}
 

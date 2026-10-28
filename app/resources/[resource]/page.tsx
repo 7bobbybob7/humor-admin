@@ -60,7 +60,7 @@ export default async function ResourceListPage({
   const resource = getResource(slug);
   if (!resource) notFound();
 
-  const { created, deleted } = await searchParams;
+  const { created, deleted, failed } = await searchParams;
   const rows = await listRows(resource);
 
   // Resolve any foreign keys appearing in the list columns.
@@ -101,6 +101,15 @@ export default async function ResourceListPage({
       {deleted && (
         <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
           Deleted.
+        </p>
+      )}
+      {failed && (
+        <p className="panel-sm mt-4 bg-red-tint px-4 py-3 text-sm font-semibold">
+          {failed === "nothing-deleted"
+            ? "Nothing was deleted — the row may already be gone."
+            : failed === "bad-id"
+              ? "That record id was not valid."
+              : `Could not delete: ${failed}`}
         </p>
       )}
 
