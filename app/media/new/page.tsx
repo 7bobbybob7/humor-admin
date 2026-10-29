@@ -4,9 +4,12 @@ import { CreateForm } from "./create-form";
 
 export const dynamic = "force-dynamic";
 
-// The model call runs in this page's Server Action; Vercel's default function
-// timeout is 10s and the fallback chain can spend a few seconds on a 503.
-export const maxDuration = 30;
+// The model call runs in this page's Server Action. The pipeline caps each
+// attempt and stops starting new ones at 30s, so this only has to sit
+// comfortably above that: the chain should always run out on its own terms and
+// return a message, rather than being killed mid-call, which reaches the
+// browser as the generic error page instead.
+export const maxDuration = 45;
 
 export default async function NewMediaPage() {
   await requireSuperadmin();

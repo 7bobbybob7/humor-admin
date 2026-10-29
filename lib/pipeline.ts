@@ -6,6 +6,17 @@ export const CAPTIONS_PER_RUN = 3;
 /** Raw model output is stored for inspection; cap it so one row cannot balloon. */
 const MAX_RAW_STORED = 4000;
 
+/** How long one model gets to answer before the chain moves on without it. */
+const ATTEMPT_TIMEOUT_MS = 9_000;
+
+/**
+ * No new attempt starts past this point. The route allows comfortably more, so
+ * an exhausted chain still returns a real error instead of being killed
+ * mid-call -- a killed function reaches the browser as the generic error page,
+ * which the form cannot turn into a message.
+ */
+const TOTAL_BUDGET_MS = 30_000;
+
 /** Used only when the database has no models configured yet. */
 const FALLBACK_MODELS = [
   "gemini-flash-latest",
@@ -101,6 +112,49 @@ function parseCaptions(raw: string | undefined): string[] {
     .map((c) => c.trim())
     .filter(Boolean)
     .slice(0, CAPTIONS_PER_RUN);
+}
+
+/** Thrown when a model is still silent at the deadline. */
+class AttemptTimeout extends Error {
+  constructor(ms: number) {
+    super(`No answer within ${ms}ms.`);
+    this.name = "AttemptTimeout";
+  }
+}
+
+/**
+ * One model call, abandoned at `ms`.
+ *
+ * gemini-flash-latest in particular sometimes neither answers nor 503s, it
+ * just hangs. Without a deadline that hang becomes the whole request.
+ */
+async function generateWithTimeout(
+  ai: GoogleGenAI,
+  modelKey: string,
+  systemPrompt: string,
+  ms: number,
+) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await ai.models.generateContent({
+      model: modelKey,
+      contents: systemPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } },
+        temperature: 1.1,
+        abortSignal: controller.signal,
+      },
+    });
+  } catch (e) {
+    // An abort surfaces as a generic DOMException; name the real cause so the
+    // llm_responses row says "timed out" rather than "operation was aborted".
+    if (controller.signal.aborted) throw new AttemptTimeout(ms);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -219,17 +273,20 @@ export async function runGeneration(
   let lastError = "No model was attempted.";
 
   for (const model of models) {
+    const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+    if (remaining < 1_000) {
+      lastError = "Ran out of time before every model could be tried.";
+      break;
+    }
+
     const attemptStart = Date.now();
     try {
-      const response = await ai.models.generateContent({
-        model: model.model_key,
-        contents: systemPrompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } },
-          temperature: 1.1,
-        },
-      });
+      const response = await generateWithTimeout(
+        ai,
+        model.model_key,
+        systemPrompt,
+        Math.min(ATTEMPT_TIMEOUT_MS, remaining),
+      );
 
       const latency = Date.now() - attemptStart;
       const captions = parseCaptions(response.text);
@@ -333,9 +390,14 @@ export async function markRequestFailed(
   reason: string,
 ): Promise<void> {
   if (!requestId) return;
-  const supabase = await createClient();
-  await supabase
-    .from("generation_requests")
-    .update({ status: "failed", error: reason.slice(0, 500), captions_created: 0 })
-    .eq("id", requestId);
+  try {
+    const supabase = await createClient();
+    await supabase
+      .from("generation_requests")
+      .update({ status: "failed", error: reason.slice(0, 500), captions_created: 0 })
+      .eq("id", requestId);
+  } catch {
+    // Correcting the log is best-effort; it must never mask the real failure
+    // that the caller is already reporting.
+  }
 }

@@ -37,22 +37,32 @@ export async function createMedia(
     return { error: e instanceof Error ? e.message : "The model call failed." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("generations").insert(
-    result.captions.map((caption) => ({
-      user_id: admin.id,
-      author_first_name: admin.first_name,
-      prompt: topic,
-      system_prompt: result.systemPrompt,
-      model: result.model,
-      request_id: result.requestId,
-      caption,
-    })),
-  );
+  // Anything thrown past this point reaches the browser as the generic error
+  // page rather than a message this form can show, so the save is guarded as
+  // well as checked. redirect() stays outside: it works by throwing.
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from("generations").insert(
+      result.captions.map((caption) => ({
+        user_id: admin.id,
+        author_first_name: admin.first_name,
+        prompt: topic,
+        system_prompt: result.systemPrompt,
+        model: result.model,
+        request_id: result.requestId,
+        caption,
+      })),
+    );
 
-  if (error) {
-    await markRequestFailed(result.requestId, `Saving captions failed: ${error.message}`);
-    return { error: `Could not save: ${error.message}` };
+    if (error) {
+      await markRequestFailed(result.requestId, `Saving captions failed: ${error.message}`);
+      return { error: `Could not save: ${error.message}` };
+    }
+  } catch (e) {
+    const reason =
+      e instanceof Error ? e.message : "The database was unreachable.";
+    await markRequestFailed(result.requestId, `Saving captions failed: ${reason}`);
+    return { error: `Could not save: ${reason}` };
   }
 
   revalidatePath("/media");
